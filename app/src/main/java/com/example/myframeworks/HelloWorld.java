@@ -250,7 +250,7 @@ public class HelloWorld {
     private static class Item {
         int id;
         public Item(Integer id) {
-            id = id;
+            this.id = id;
         }
     }
 }
