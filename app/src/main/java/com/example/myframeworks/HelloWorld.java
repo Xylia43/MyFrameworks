@@ -662,8 +662,9 @@ public class HelloWorld {
         // /divide by zero
         /**
          * onErrorReturnItem
+         * when error, the item behind be dropped out
          */
-        Observable.just(2,1,0)
+        Observable.just(2,1,0,1)
                 .map(item->2/item)
                 .onErrorReturnItem(-1)
                 .subscribe(System.out::println);
@@ -673,6 +674,7 @@ public class HelloWorld {
         // -1
         /**
          * onErrorResumeWith
+         * when error, the item behind be dropped out
          */
         Observable.just(2,1,0,2)
                 .map(item->2/item)
