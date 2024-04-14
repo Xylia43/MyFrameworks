@@ -21,6 +21,9 @@ import static java.lang.Thread.sleep;
 
 public class HelloWorld {
     public static void main(String[] args) {
+        /**
+         * create operator
+         */
 //        Flowable.just("Hello world").subscribe(System.out::println);
         createExample();
         justExample();
@@ -32,11 +35,24 @@ public class HelloWorld {
         singleMaybeExample();
         completableExample();
         coldObservableExample();
-        try {
-            hotObservableExample();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+//        try {
+//            hotObservableExample();
+//        } catch (InterruptedException e) {
+//            throw new RuntimeException(e);
+//        }
+        /**
+         * filter operator example
+         */
+        filterOperatorExample();
+        /**
+         * conditional operator example
+         */
+        conditionalOperatorExample();
+        /**
+         * utilityAndErrorHandleExample
+         */
+        utilityAndErrorHandleExample();
+
     }
     public static void createExample(){
         System.out.println("hello");
@@ -362,5 +378,312 @@ public class HelloWorld {
         };
         observable.subscribe(resourceObserver);
         resourceObserver.dispose();
+    }
+    @SuppressLint("CheckResult")
+    public static void filterOperatorExample(){
+        Observable.just("hello","my","cat")
+                .filter(item->item.length()!=2) // emit the items satisfy this condition
+                .subscribe(System.out::println);
+        // prints ->
+        // Hello
+        // cat
+
+        Observable.just("hello","my","cat")
+                .take(2) // emit 2 items
+                .subscribe(System.out::println);
+        // prints ->
+        // Hello
+        // my
+
+        Observable.just("hello","my","cat")
+                .skip(2) // skip 2 items
+                .subscribe(System.out::println);
+        // prints ->
+        // cat
+
+        Observable.just("hello","hello","hello")
+                .distinct() // duplicates will be filter out
+                .subscribe(System.out::println);
+        // prints ->
+        // hello
+
+        Observable.just("hello","hola","hay")
+                .first("no item emit") // pass the first item to downstream.
+                // set up the default value in case no item generate.
+                .subscribe(System.out::println);
+        // prints ->
+        // hello
+
+        Observable.just("hello","hola","hay")
+                .last("no item emit") // pass the last item to downstream.
+                // set up the default value in case no item generate.
+                .subscribe(System.out::println);
+        // prints ->
+        // hay
+
+    }
+    @SuppressLint("CheckResult")
+    public static void conditionalOperatorExample(){
+        Observable.just("hello","my","cat")
+                .takeWhile(item->item.length()<=3) //
+                .subscribe(System.out::println);
+        // prints ->
+        // my
+        // cat
+
+        Observable.just(2,3,4,5)
+                .skipWhile(item->item<4) //
+                .subscribe(System.out::println);
+        // prints ->
+        // 4
+        // 5
+
+        Observable.just("jack","rain","kate")
+                .all(item->item.length()==4) //
+                .subscribe(System.out::println);
+        // prints ->
+        // true
+
+        Observable.just("jack","rain","kate")
+                .any(item->item.length()==3) //
+                .subscribe(System.out::println);
+        // prints ->
+        // false
+
+        Observable.just("jack","rain","kate")
+                .filter(item->item.length()==3)
+                .defaultIfEmpty("YxY")
+                .subscribe(System.out::println);
+        // prints ->
+        // YxY
+
+        Observable.just("jack","rain","kate")
+                .filter(item->item.length()==3)
+                .switchIfEmpty(Observable.just("hello","other","source"))
+                .subscribe(System.out::println);
+        // prints ->
+        // hello
+        // other
+        // source
+    }
+
+    /**
+     * transforming Observables
+     * map
+     * sorted
+     * scan
+     * buffer
+     * groupBy
+     * flatMap
+     * toList
+     */
+    @SuppressLint("CheckResult")
+    public static void transformingExample(){
+        Observable.just(1,2,3)
+                .map(item->String.valueOf(item))
+                .subscribe(System.out::println);
+        // prints ->
+        // "1"
+        // "2"
+        // "3"
+
+        Observable.just(3,1,2,4)
+                .sorted()
+                .subscribe(System.out::println);
+        // prints ->
+        // 1
+        // 2
+        // 3
+        // 4
+        Observable.just(3,1,2)
+                .scan((accumulator,item)->accumulator + item)
+                // when 3 is generate, accumulator=0 item = 3 sum= 3
+                // when 1 is generate, accumulator=3 item = 1 sum= 4
+                // when 2 is generate, accumulator=4 item = 2 sum= 6
+                .subscribe(System.out::println);
+        // prints ->
+        // 3
+        // 4
+        // 6
+
+        Observable.range(0,10)
+                .buffer(3)// items will be generate in a batch of 3
+                .subscribe(System.out::println);
+        // prints ->
+        // [0,1,2]
+        // [3,4,5]
+        // [6,7,8]
+        // [9]
+
+        Observable.just("a","b","ab","bc","abc","bcd")
+                .groupBy(String::length)
+                .flatMapSingle(Observable::toList)
+                .subscribe(System.out::println);
+        // prints ->
+        // [a,b]
+        // [ab,bc]
+        // [abc,bcd]
+
+        Observable.just(1,2,3)
+                .flatMap(item->Observable.just(item*2))
+                .subscribe(System.out::println);
+        // prints ->
+        // 2
+        // 4
+        // 6
+
+        Observable.just(1,2,3)
+                .toList()
+                .subscribe(System.out::println);
+        // prints -> [1,2,3]
+    }
+
+    /**
+     * combining observables
+     * mergeWith : the order depends on the emit timing, not always ob1 then ob2
+     * zipWith
+     */
+    @SuppressLint("CheckResult")
+    public static void combiningExample(){
+        Observable.just(1,2)
+                .mergeWith(Observable.just(3,4))
+                .subscribe(System.out::println);
+        // prints -> (order could be change)
+        // 1
+        // 2
+        // 3
+        // 4
+        Observable obs1 = Observable.just("A","B");
+        Observable obs2 = Observable.just("C","D");
+        obs1.zipWith(obs2,(item1,item2)->{
+            return String.format("%s%s",item1,item2);
+        }).subscribe(finalResult->System.out.println("item: " + finalResult));
+        // prints ->
+        // item: AC
+        // item: BD
+
+    }
+
+    /**
+     * --utility ErrorHandle
+     * delay
+     * timeout
+     * observeOn
+     * subscribeOn
+     * doOnNext
+     * doOnDisposes
+     * --error handle
+     * retry
+     * onErrorReturnItem
+     * onErrorResumeWith
+     */
+    @SuppressLint("CheckResult")
+    public static void utilityAndErrorHandleExample(){
+        Observable.just("after xx seconds")
+                .delay(2,TimeUnit.SECONDS)
+                .subscribe(System.out::println);
+        // prints after 2 seconds ->
+        // after xx seconds
+        /**
+         * timeout is useful when you want specific maximum amount time between emission items
+         */
+        Observable.just("timeout instance")
+                .timeout(1,TimeUnit.SECONDS) // in here, if the observable not emit anything in 1 seconds,
+                // onError method will be called.
+                .subscribe(System.out::println);
+        // prints ->
+        // timeout instance
+
+        /**
+         * observeOn change the thread on which we subscribe item
+         */
+        System.out.println(Thread.currentThread().getName());
+        Observable.just("observeOn instance")
+                .observeOn(Schedulers.newThread())
+                .subscribe(item->{
+                    System.out.println(Thread.currentThread().getName());
+                    System.out.println(item);
+                });
+        // prints ->
+        // main
+        // RxNewThreadScheduler-1
+        // observeOn instance
+        /**
+         * subscribeOn change the thread on which we emit items
+         */
+        System.out.println(Thread.currentThread().getName());
+        Observable.just("subscribeOn instance")
+                .subscribeOn(Schedulers.newThread())
+                .subscribe(item->{
+                    System.out.println(Thread.currentThread().getName());
+                    System.out.println(item);
+                });
+        // prints ->
+        // main
+        // RxNewThreadScheduler-1
+        // subscribeOn instance
+
+        /**
+         * emit 1, doOnNext 1
+         */
+        Observable.just(1,2,2)
+                .doOnNext(item->System.out.println("Log some info"))
+                .filter(item->item==2)
+                .subscribe(System.out::println);
+        // prints ->
+        // Log some info
+        // Log some info
+        // 2
+        // Log some info
+        // 2
+        /** Disposable
+         * release no longer need resources here
+         */
+        Disposable disposable = Observable.timer(1,TimeUnit.SECONDS)
+                .doOnDispose(()->System.out.println("Disposed Called"))
+                .subscribe(System.out::println);
+        disposable.dispose();
+        // prints ->
+        // Disposed Called
+
+        /**
+         * retry
+         */
+        Observable.just(2,1,0)
+                .map(item->2/item)
+                .retry(1)// retry the time when face error
+                .subscribe(item-> System.out.println(item),
+                        throwable -> System.out.println(throwable.getMessage()));
+        // prints ->
+        // 1
+        // 2
+        // 1
+        // 2
+        // /divide by zero
+        /**
+         * onErrorReturnItem
+         */
+        Observable.just(2,1,0)
+                .map(item->2/item)
+                .onErrorReturnItem(-1)
+                .subscribe(System.out::println);
+        // prints ->
+        // 1
+        // 2
+        // -1
+        /**
+         * onErrorResumeWith
+         */
+        Observable.just(2,1,0,2)
+                .map(item->2/item)
+                .onErrorResumeWith(Observable.just(5,6,7))
+                .subscribe(System.out::println);
+        // prints ->
+        // 1
+        // 2
+        // 5
+        // 6
+        // 7
+
     }
 }
