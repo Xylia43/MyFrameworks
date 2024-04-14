@@ -10,8 +10,11 @@ import java.util.concurrent.TimeUnit;
 
 import io.reactivex.rxjava3.annotations.NonNull;
 import io.reactivex.rxjava3.core.*;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.functions.Action;
+import io.reactivex.rxjava3.observables.ConnectableObservable;
+import io.reactivex.rxjava3.observers.ResourceObserver;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import static java.lang.Thread.sleep;
@@ -28,6 +31,12 @@ public class HelloWorld {
         actionExample();
         singleMaybeExample();
         completableExample();
+        coldObservableExample();
+        try {
+            hotObservableExample();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
     public static void createExample(){
         System.out.println("hello");
@@ -252,5 +261,106 @@ public class HelloWorld {
         public Item(Integer id) {
             this.id = id;
         }
+    }
+
+    /**
+     * observer 1 a
+     * observer 1 b
+     * observer 1 c
+     * observer 2 a b c same as observer 1
+     * observer 3 a b c same as observer 1
+     */
+    public static void coldObservableExample(){
+        Observable<String> observable = Observable.just("a","b","c");
+        observable.subscribe((item)->System.out.println("observer 1" + item));
+        observable.subscribe((item)->System.out.println("observer 2" + item));
+        observable.subscribe((item)->System.out.println("observer 3" + item));
+    }
+
+    /**
+     * observer 1,sec: 0
+     * observer 1,sec: 1
+     * observer 1,sec: 2
+     * observer 1,sec: 3
+     * observer 1,sec: 4
+     * observer 1,sec: 5
+     * observer 2,sec: 5
+     * observer 1,sec: 6
+     * observer 2,sec: 6
+     * observer 1,sec: 7
+     * observer 2,sec: 7
+     * ...
+     * @throws InterruptedException
+     */
+    public static void hotObservableExample() throws InterruptedException {
+        ConnectableObservable observable = Observable.interval(1, TimeUnit.SECONDS).publish();
+        observable.connect();// this means the hot observable start to emmit items.
+        observable.subscribe(item->{
+            System.out.println("observer 1,sec: " + item);
+        });
+        Thread.sleep(5000);
+        observable.subscribe(item->{
+            System.out.println("observer 2,sec: " + item);
+        });
+        Thread.sleep(50000);
+    }
+
+    /**
+     * if you don't need emissions from some stream, you should always dispose this.
+     */
+    public static void disposableExample(){
+        // example 1
+        Observable<Long> observable = Observable.interval(1, TimeUnit.SECONDS);
+        Disposable disposable = observable.subscribe(item->System.out.println("item:"+ item));
+        if(disposable.isDisposed()){// ?
+            disposable.dispose();
+        }
+        // example 2
+        /**
+         * composite disposable is basically a collection which can hold disposable objects
+         * helpful use in multi streams and you want to free up resource at once
+         */
+        CompositeDisposable compositeDisposable = new CompositeDisposable();
+        observable.subscribe(new Observer<Long>() {
+            @Override
+            public void onSubscribe(@NonNull Disposable d) {
+                compositeDisposable.add(d);
+            }
+
+            @Override
+            public void onNext(@NonNull Long aLong) {
+
+            }
+
+            @Override
+            public void onError(@NonNull Throwable e) {
+
+            }
+
+            @Override
+            public void onComplete() {
+
+            }
+        });
+        compositeDisposable.dispose();// free up all the resources, no memory leak no memory overhead
+        // example 3, work with object of type resource observer
+        ResourceObserver<Long> resourceObserver = new ResourceObserver<Long>() {
+            @Override
+            public void onNext(@NonNull Long aLong) {
+                System.out.println("item"+ aLong);
+            }
+
+            @Override
+            public void onError(@NonNull Throwable e) {
+
+            }
+
+            @Override
+            public void onComplete() {
+
+            }
+        };
+        observable.subscribe(resourceObserver);
+        resourceObserver.dispose();
     }
 }
