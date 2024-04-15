@@ -16,6 +16,11 @@ import io.reactivex.rxjava3.functions.Action;
 import io.reactivex.rxjava3.observables.ConnectableObservable;
 import io.reactivex.rxjava3.observers.ResourceObserver;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import io.reactivex.rxjava3.subjects.AsyncSubject;
+import io.reactivex.rxjava3.subjects.BehaviorSubject;
+import io.reactivex.rxjava3.subjects.PublishSubject;
+import io.reactivex.rxjava3.subjects.ReplaySubject;
+import io.reactivex.rxjava3.subjects.Subject;
 
 import static java.lang.Thread.sleep;
 
@@ -52,6 +57,15 @@ public class HelloWorld {
          * utilityAndErrorHandleExample
          */
         utilityAndErrorHandleExample();
+        /**
+         * publishSubjectExample
+         */
+        publishSubjectExample();
+        behaviourSubjectExample();
+        replaySubjectExample();
+        asyncSubjectExample();
+        customObservableOperator();
+        threadingExample();
 
     }
     public static void createExample(){
@@ -687,5 +701,192 @@ public class HelloWorld {
         // 6
         // 7
 
+    }
+
+    /**
+     * received item: 0
+     * received item: 0
+     * received item: 1
+     * received item: 1
+     * received item: 2
+     * received item: 2
+     * received item: 3
+     * received item: 3
+     * received item: 4
+     * received item: 4
+     */
+    public static void publishSubjectExample(){
+        // create two sources
+        Observable<Long> source1 = Observable.interval(1,TimeUnit.SECONDS);
+        Observable<Long> source2 = Observable.interval(1,TimeUnit.SECONDS);
+        // create PublishSubject Object
+        Subject<Long> subject = PublishSubject.create();
+        // subscribe to the PublishSubject object
+        subject.subscribe(item->System.out.println("received item: " + item));
+        // still need to tell the subject that it will receive items from two different sources
+        source1.subscribe(subject);
+        source2.subscribe(subject);
+
+        // prevent program from exiting
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * achieve only latest item
+     * person 1 listen song: 1
+     * person 1 listen song: 2
+     * person 1 listen song: 3
+     * person 1 listen song: 4
+     * person 2 listen song: 4
+     * person 1 listen song: 5
+     * person 2 listen song: 5
+     * person 1 listen song: 6
+     * person 2 listen song: 6
+     * person 3 listen song: 6
+     */
+    @SuppressLint("CheckResult")
+    public static void behaviourSubjectExample(){
+        // represent radio play in room
+        Subject<Integer> subject = BehaviorSubject.create();
+        // person 1 enter the room and start listen song
+        subject.subscribe(item->System.out.println("person 1 listen song: " + item));
+        subject.onNext(1);
+        subject.onNext(2);
+        subject.onNext(3);
+        subject.onNext(4);
+        // person 2 enter the room and start listen song
+        subject.subscribe(item->System.out.println("person 2 listen song: " + item));
+        subject.onNext(5);
+        subject.onNext(6);
+        subject.subscribe(item->System.out.println("person 3 listen song: " + item));
+
+    }
+
+    /**
+     * receiver will get all the items no matter when subscribed
+     * student A received : Music
+     * student A received : Movie
+     * student A received : Novice
+     * student B received : Music
+     * student B received : Movie
+     * student B received : Novice
+     */
+    public static void replaySubjectExample(){
+        // represent teacher
+        Subject<String> subject = ReplaySubject.create();
+        // student A entered the classroom
+        subject.subscribe(item->System.out.println("student A received : " + item));
+        // teacher talks about some important topics
+        subject.onNext("Music");
+        subject.onNext("Movie");
+        subject.onNext("Novice");
+        // student B entered the classroom late
+        subject.subscribe(item->System.out.println("student B received : " + item));
+    }
+
+    /**
+     * only get the last item
+     * Async student A received : Async science
+     * Async student B received : Async science
+     */
+    public static void asyncSubjectExample(){
+        // represent teacher
+        Subject<String> subject = AsyncSubject.create();
+        // student A entered the classroom
+        subject.subscribe(item->System.out.println("Async student A received : " + item));
+        // teacher talks about some important topics
+        subject.onNext("Async Music");
+        subject.onNext("Async Movie");
+        subject.onNext("Async Novice");
+        // student B entered the classroom late
+        subject.subscribe(item->System.out.println("Async student B received : " + item));
+        subject.onNext("Async math");
+        subject.onNext("Async science");
+        // teacher ends the class
+        subject.onComplete();
+    }
+
+    /**
+     * custom observable operator
+     */
+    public static void customObservableOperator(){
+
+        ObservableOperator<Integer,Integer> takeEven = new ObservableOperator<Integer, Integer>() {
+            @Override
+            public @NonNull Observer<? super Integer> apply(@NonNull Observer<? super Integer> observer) throws Throwable {
+                return new Observer<Integer>() {
+                    @Override
+                    public void onSubscribe(@NonNull Disposable d) {
+
+                    }
+
+                    @Override
+                    public void onNext(@NonNull Integer integer) {
+                        if(integer%2==0){
+                            observer.onNext(integer);
+                        }
+                    }
+
+                    @Override
+                    public void onError(@NonNull Throwable e) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                };
+            }
+        };
+        Observable.just(1,2,3,4)
+                .lift(takeEven)
+                .subscribe(item->System.out.println("lift my even: " + item));
+    }
+
+    /**
+     * subscribeOn
+     * observeOn
+     * when main thread down, the 1onRxComputationThreadPool also down
+     * --- when only --.subscribeOn(Schedulers.computation())
+     * pushing item 1onRxComputationThreadPool-6 Thread
+     * receiving item 1onRxComputationThreadPool-6 Thread
+     * pushing item 2onRxComputationThreadPool-6 Thread
+     * receiving item 2onRxComputationThreadPool-6 Thread
+     * pushing item 3onRxComputationThreadPool-6 Thread
+     * receiving item 3onRxComputationThreadPool-6 Thread
+     * --- when both , and observeOn after doOnNext
+     * pushing item 1onRxComputationThreadPool-6 Thread
+     * pushing item 2onRxComputationThreadPool-6 Thread
+     * pushing item 3onRxComputationThreadPool-6 Thread
+     * receiving item 1onRxSingleScheduler-1 Thread
+     * receiving item 2onRxSingleScheduler-1 Thread
+     * receiving item 3onRxSingleScheduler-1 Thread
+     * ---- when only .observeOn(Schedulers.single())
+     * pushing item 1 on RxSingleScheduler-1 Thread
+     * receiving item 1 on RxSingleScheduler-1 Thread
+     * pushing item 2 on RxSingleScheduler-1 Thread
+     * receiving item 2 on RxSingleScheduler-1 Thread
+     * pushing item 3 on RxSingleScheduler-1 Thread
+     * receiving item 3 on RxSingleScheduler-1 Thread
+     */
+    @SuppressLint("CheckResult")
+    public static void threadingExample(){
+        // subscribe
+        Observable.just(1,2,3)
+                .subscribeOn(Schedulers.computation())
+                .observeOn(Schedulers.single())
+                .doOnNext(item->System.out.println("pushing item " + item + " on " + Thread.currentThread().getName() + " Thread"))
+                .subscribe(item->System.out.println("receiving item " + item + " on " + Thread.currentThread().getName() + " Thread"));
+
+        try {
+            Thread.sleep(4000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
